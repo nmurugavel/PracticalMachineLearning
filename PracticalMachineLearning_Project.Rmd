@@ -1,0 +1,188 @@
+---
+title: "Practical Machine Learning Project"
+author: "N. Murugavel"
+date: "19 December 2015"
+output: html_document
+---
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+# Loading required libraries
+library(caret)
+library(randomForest)
+
+```
+
+## Executive Summary
+
+Six participants were asked to perform barbell lifts in 5 different ways, and their body movements were measured using devices. The goal of this project is to use the data to train a model to predict the manner in which they did the exercise.
+
+Random forest, gradient boosting and linear discriminatary analysis were used with k-fold cross validation. Random forest has an accuracy of 99.36%, and an out of sample error of 0.42%. It was used to predict for 20 test cases and submitted.
+
+
+## The data sets
+
+The data for this project come from the source http://groupware.les.inf.puc-rio.br/har. This has two data sets:
+
+1. The training data set is available in https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv.
+2. The testing data set is available in https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv.
+
+The two files were downloaded and are in the current working directory.
+
+```{r cache = TRUE}
+# Load training and testing data from csv files
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+
+```
+
+## Exploratory data analysis
+
+```{r}
+dim(training)
+dim(testing)
+
+```
+
+The data sets have 160 variables. The training set has 19622 observations and the testing set has 20. The `classe` variable in the training set has the activity class, which is the outcome.
+
+The summary of training set is in appendix 1.
+
+## Feature selection
+
+The summary shows that the first 7 variables are for identification. These are removed.
+
+Next we look at near zero variance variables and remove them. We also remove the columns which have NA in 19216 observations.
+
+```{r cache = TRUE}
+# remove first 7 variables
+training <- training[, -c(1:7)]
+testing <- testing[, -c(1:7)]
+
+# remove near zero variance variables
+nzv <- nearZeroVar(training)
+training <- training[, -nzv]
+testing <- testing[, -nzv]
+
+# remove variables with NA in most observations (approximately > 10% = 2000)
+nav <- as.integer()
+for(i in 1:length(training))
+{
+	if(sum(is.na(training[, i])) > 2000)
+		nav <- c(nav, i)
+}
+training <- training[, -nav]
+testing <- testing[, -nav]
+
+```
+
+The remaining variables (except classe, which is the outcome) will be used for training and prediction.
+
+
+## Cross validation
+
+We will use K-fold cross validation. Four folds will be used.
+
+```{r}
+cv <- trainControl(method = "cv", number = 4, allowParallel = TRUE)
+
+```
+
+
+## Model
+
+We will develop 3 models: random forest, gradient boosting and linear discriminant analysis, and select the model with highest accuracy.
+
+```{r cache = TRUE, message = FALSE, warning = FALSE}
+# random forest
+set.seed(32323)
+rfmodel <- train(classe ~ ., data = training, trControl = cv, method = "rf")
+
+# gradient boosting
+set.seed(32323)
+gbmmodel <- train(classe ~ ., data = training, trControl = cv, method = "gbm", verbose = FALSE)
+
+# linear discriminant analysis
+set.seed(32323)
+ldamodel <- train(classe ~ ., data = training, trControl = cv, method = "lda")
+
+```
+
+
+## Out of sample error
+
+**Random forest:**
+
+```{r echo = FALSE}
+rfmodel
+```
+
+**Gradient boosting:**
+
+```{r echo = FALSE}
+gbmmodel
+```
+
+**Linear discriminant analysis:**
+
+```{r echo = FALSE}
+ldamodel
+```
+
+**Summary of accuracy of the three models:**
+
+Model | Accuracy |
+------|----------|
+Random forest | 0.9936806 |
+Gradient boosting | 0.9631535 |
+Linear discriminant analysis | 0.7031905 |
+
+Since random forest model has the best accuracy, we select it.
+
+From the below we can see the out of sample error estimate for random forest model is 0.42%.
+
+```{r echo = FALSE}
+rfmodel$finalModel
+
+```
+
+The following plots show the accuracy achieved by random forest and gradient boosting training:
+
+```{r echo = FALSE}
+# Accuracy plot - random forest
+plot(rfmodel, main = "Random forest - accuracy")
+
+# Accuracy plot - gradient boosting
+plot(gbmmodel, main = "Gradient boosting - accuracy")
+
+```
+
+The following plot shows the variable importance in the random forest model:
+
+```{r echo = FALSE}
+varImpPlot(rfmodel$finalModel, main = "Random forest - variable importance")
+
+```
+
+
+## Prediction
+
+The random forest model was used to predict the outcome for the  test data set.
+
+```{r}
+rfpredict <- predict(rfmodel, testing)
+
+```
+
+**The predictions of random forest model was submitted to the programming assignment for automatic grading. The predictions for each of the 20 test cases were correct.**
+
+
+
+## Appendix 1 - sumary of training set
+
+```{r cache = TRUE, echo = FALSE}
+# loading again to report as many variables in training are removed
+training2 <- read.csv("pml-training.csv")
+summary(training2)
+
+```
+
